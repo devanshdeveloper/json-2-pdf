@@ -1,0 +1,40 @@
+{
+  "name": "json-2-pdf",
+  "version": "1.0.1",
+  "description": "A lib for json to pdf",
+  "main": "dist/esm/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "scripts": {
+    "build:cjs": "tsc --outDir dist/cjs --module commonjs",
+    "build:esm": "tsc --outDir dist/esm --module esnext",
+    "build": "npm run build:cjs && npm run build:esm",
+    "watch:cjs": "tsc --outDir dist/cjs --module commonjs --watch",
+    "watch:esm": "tsc --outDir dist/esm --module esnext --watch",
+    "watch": "npm run watch:esm & npm run watch:cjs",
+    "publish": "git add . && git commit -m /\"code updated\"/ && git push && npm publish"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/devanshdeveloper/json-to-pdf.git"
+  },
+  "keywords": [
+    "dom",
+    "utility",
+    "javascript",
+    "pdf",
+    "json",
+    "makepdf",
+    "html2canvas"
+  ],
+  "author": "Devansh Khetwani",
+  "license": "MIT",
+  "dependencies": {
+    "@devanshdeveloper/json-to-html": "^1.0.3",
+    "css-unit-manager": "^1.0.2",
+    "extendeddomjs": "^1.0.8",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.2",
+    "typescript": "^5.0.0"
+  }
+}
