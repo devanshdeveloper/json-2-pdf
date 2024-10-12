@@ -1,6 +1,6 @@
 {
-  "name": "json-2-pdf",
-  "version": "1.0.2",
+  "name": "@devanshdeveloper/json-to-pdf",
+  "version": "1.0.3",
   "description": "A lib for json to pdf",
   "main": "dist/esm/index.js",
   "module": "dist/esm/index.js",
