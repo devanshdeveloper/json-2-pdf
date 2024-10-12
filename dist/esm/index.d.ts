@@ -22,12 +22,12 @@ interface JSONToPDFOptions {
 }
 export declare class JSONToPDF {
     private jsonToHtml;
-    private definedElements;
     private pagenumber;
     private ratio;
     private options;
     private pdfContainer;
     constructor(options: JSONToPDFOptions);
+    replaceElementsPlaceholders(elements: any[], payload: any): any[];
     createPageElement(): ExtendedDOMJS;
     createPageContentElement(): ExtendedDOMJS;
     addPage(): {
@@ -37,6 +37,14 @@ export declare class JSONToPDF {
     checkSpaceInPage(pageContentElement: HTMLElement): boolean;
     createElements(): void;
     paintPDFonScreen(pdfContainer: HTMLElement | null): void;
+    getDomData(element?: Element): {
+        tag: string;
+        attributes: {
+            [key: string]: string;
+        };
+        children: any[];
+        text?: string;
+    };
     download({ onProgress, // Provide default empty function to avoid errors
     onComplete, // Provide default empty function to avoid errors
     onError, // Provide default empty function to avoid errors

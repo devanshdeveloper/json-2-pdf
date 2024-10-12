@@ -31,7 +31,6 @@ interface JSONToPDFOptions {
 
 export class JSONToPDF {
   private jsonToHtml: JSONToHTML;
-  private definedElements: any[];
   private pagenumber: number;
   private ratio: number;
   private options: JSONToPDFOptions;
@@ -57,19 +56,71 @@ export class JSONToPDF {
     const pageHeight = unit(pageWidth).multiply(this.ratio).toString();
     options.page.styles.height = pageHeight;
     options.page.styles.width = pageWidth;
-    if (options.defineElements) {
-      this.definedElements = options.defineElements.map((e) => {
-        const iterator = this.jsonToHtml.replacePlaceholders(e.iterator, {
-          payload: options.payload,
+    options.elements = options.elements
+      .map((e) => {
+        const tagName = e.tag;
+        const definedElement = options.defineElements?.find((e) => {
+          return e.name === tagName;
         });
-
-        return { ...e, iterator };
-      });
-    } else {
-      this.definedElements = [];
-    }
+        if (definedElement) {
+          const iterator = this.jsonToHtml.replacePlaceholders(
+            definedElement.iterator,
+            { payload: options.payload }
+          );
+          const elements = iterator.map((item: any) => {
+            return this.replaceElementsPlaceholders(definedElement.elements, {
+              item,
+              payload: options.payload,
+            });
+          });
+          return elements;
+        } else {
+          return this.replaceElementsPlaceholders([e], {
+            payload: options.payload,
+          });
+        }
+      })
+      .flat();
     this.options = options;
     this.pdfContainer = null;
+  }
+
+  replaceElementsPlaceholders(elements: any[], payload: any) {
+    return elements.map((e) => {
+      const tagName = this.jsonToHtml.replacePlaceholders(e.tag, payload);
+      const newAttributes: any = {};
+      const attributeKeys = Object.keys(e.attributes);
+      attributeKeys.forEach((attributeKey) => {
+        const attributeValue = e.attributes[attributeKey];
+        const newAttributeKey = this.jsonToHtml.replacePlaceholders(
+          attributeKey,
+          payload
+        );
+        if (typeof attributeValue === "string") {
+          newAttributes[newAttributeKey] = this.jsonToHtml.replacePlaceholders(
+            attributeValue,
+            payload
+          );
+        } else if (Array.isArray(attributeValue)) {
+          newAttributes[newAttributeKey] = attributeValue.map((value) =>
+            this.jsonToHtml.replacePlaceholders(value, payload)
+          );
+        } else {
+          newAttributes[newAttributeKey] = attributeValue;
+        }
+      });
+      const returnValue: any = {
+        tag: tagName,
+        attributes: newAttributes,
+      };
+      if (e.children) {
+        returnValue.children = this.replaceElementsPlaceholders(
+          e.children,
+          payload
+        );
+      }
+      return returnValue;
+    });
   }
 
   createPageElement() {
@@ -123,16 +174,21 @@ export class JSONToPDF {
       return false;
     }
   }
+
   createElements() {
     let pageContentElement: HTMLElement | null = null;
     let pageElement: HTMLElement | null = null;
-    
+
     const moveToAnotherPage = () => {
+      if (pageContentElement) {
+        new ExtendedDOMJS([pageContentElement]).styles({
+          height: this.options.page.styles.height,
+        });
+      }
       const page = this.addPage();
       const oldPageContentElement = pageContentElement;
       pageContentElement = page.pageContentElement;
       pageElement = page.pageElement;
-      
       if (pageContentElement) {
         if (this.options.fixedElements && pageContentElement) {
           this.jsonToHtml.manipulateDOMFromJSON(
@@ -143,95 +199,80 @@ export class JSONToPDF {
         }
         if (oldPageContentElement) {
           const lastChild =
-          oldPageContentElement.children[
-            oldPageContentElement.children.length - 1
-          ];
+            oldPageContentElement.children[
+              oldPageContentElement.children.length - 1
+            ];
           oldPageContentElement.removeChild(lastChild);
           pageContentElement.append(lastChild as Element);
         }
       }
     };
     moveToAnotherPage();
-    
-    const setPageContentHeight = () => {
-      if (pageContentElement) {
-        new ExtendedDOMJS([pageContentElement]).styles({
-          height: this.options.page.styles.height,
-        });
-        if (!this.checkSpaceInPage(pageContentElement)) {
-          moveToAnotherPage();
-          pageContentElement.style.height = this.options.page.styles.height;
+
+    this.options.elements.forEach((element, i) => {
+      const paintElement = () => {
+        if (pageContentElement) {
+          this.jsonToHtml.manipulateDOMFromJSON(element, pageContentElement, {
+            payload: this.options.payload,
+            pagenumber: this.pagenumber,
+          });
         }
-      }
-    };
-    
-    for (let i = 0; i < this.options.elements.length; i++) {
-      const elementData = this.options.elements[i];
-      const definedElement = this.definedElements?.find(
-        (e) => e.name === elementData.tag
-      );
-
-      if (definedElement && definedElement.iterator.length) {
-        for (let j = 0; j < definedElement.iterator.length; j++) {
-          const paintElement = () => {
-            if (pageContentElement) {
-              this.jsonToHtml.manipulateDOMFromJSON(
-                definedElement.elements,
-                pageContentElement,
-                {
-                  item: definedElement.iterator[j],
-                  pagenumber: this.pagenumber,
-                }
-              );
-            }
-          };
-
-          if (this.checkSpaceInPage(pageContentElement!)) {
-            paintElement();
-          } else {
-            moveToAnotherPage();
-            paintElement();
-          }
-
-          if (
-            definedElement.iterator.length - 1 === j &&
-            this.options.elements.length - 1 === i
-          ) {
-            setPageContentHeight();
-          }
-        }
+      };
+      if (this.checkSpaceInPage(pageContentElement!)) {
+        paintElement();
       } else {
-        const paintElement = () => {
-          if (pageContentElement) {
-            this.jsonToHtml.manipulateDOMFromJSON(
-              [elementData],
-              pageContentElement,
-              {
-                payload: this.options.payload,
-                pagenumber: this.pagenumber,
-              }
-            );
-          }
-        };
+        moveToAnotherPage();
+        paintElement();
+      }
 
-        if (this.checkSpaceInPage(pageContentElement!)) {
-          paintElement();
-        } else {
-          moveToAnotherPage();
-          paintElement();
-        }
-
-        if (this.options.elements.length - 1 === i) {
-          setPageContentHeight();
+      if (this.options.elements.length - 1 === i) {
+        if (pageContentElement) {
+          new ExtendedDOMJS([pageContentElement]).styles({
+            height: this.options.page.styles.height,
+          });
         }
       }
-    }
+    });
   }
 
   paintPDFonScreen(pdfContainer: HTMLElement | null) {
     this.pdfContainer = pdfContainer;
     this.createElements();
   }
+
+  getDomData(element: Element = this.pdfContainer as Element) {
+    let data: {
+      tag: string;
+      attributes: { [key: string]: string };
+      children: any[];
+      text?: string;
+    } = {
+      tag: element.tagName.toLowerCase(),
+      attributes: {},
+      children: [],
+    };
+  
+    // Get all attributes of the element
+    for (let i = 0; i < element.attributes.length; i++) {
+      const attr = element.attributes[i];
+      data.attributes[attr.name] = attr.value;
+    }
+  
+    // Recursively collect data from children elements
+    const childrenArray = Array.from(element.children); // Convert HTMLCollection to an array
+    for (let child of childrenArray) {
+      data.children.push(this.getDomData(child)); // Recursively pass the child element
+    }
+  
+    // If element has text content and no children, add the text
+    if (childrenArray.length === 0 && element.textContent?.trim()) {
+      data.text = element.textContent.trim();
+    }
+  
+    return data;
+  }
+  
+  
 
   async download({
     onProgress = () => {}, // Provide default empty function to avoid errors
